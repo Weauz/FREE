@@ -1,0 +1,285 @@
+==============================================================================
+  FREE - French Reverse Engineer Everything
+  Comprendre comment une appli ou un site fonctionne, puis en créer votre version
+==============================================================================
+
+FREE est une application Windows en français qui :
+  1. analyse une appli Windows (.exe), une appli Electron (Discord, VS Code...)
+     ou un site web, grâce à l'outil REA (Reverse Engineer Anything) et à Ghidra ;
+  2. demande à Claude Code d'écrire un plan qui explique comment elle marche ;
+  3. fait reconstruire par Claude Code une version originale, à vous ;
+  4. vous laisse ensuite demander des changements (thème, nouvelles fonctions...).
+
+Tout tourne sur votre PC : rien n'est envoyé sur un service d'analyse en ligne
+(seul Claude Code échange avec les serveurs d'Anthropic pour réfléchir et coder).
+
+
+------------------------------------------------------------------------------
+ 1. CE QU'IL VOUS FAUT
+------------------------------------------------------------------------------
+
+  - Windows 10 ou 11, 64 bits.
+  - Environ 3 Go d'espace libre et une connexion Internet pendant l'installation.
+  - Un abonnement Claude Pro, Max, Team ou Enterprise pour Claude Code
+    (l'offre gratuite de claude.ai ne suffit pas). Sans abonnement, l'analyse
+    marche quand même, mais pas le plan, la reconstruction ni l'enquête.
+
+L'installateur s'occupe du reste : Node.js, Java, Ghidra, REA et Claude Code.
+Aucun droit administrateur n'est nécessaire.
+
+
+  Deux façons de l'avoir :
+      FREE-Installation.exe ... l'installateur (un seul fichier, le plus simple)
+      ou le dossier FREE ........ FREE.exe + LISEZ-MOI.txt + ressources\
+                                  (fonctionne sans installation, là où il est)
+
+  Contenu du dossier FREE (installé ou non) :
+      FREE.exe ........ le programme : c'est le seul fichier à lancer
+      LISEZ-MOI.txt ... ce guide
+      ressources\ ..... les fichiers internes de FREE (ne rien y modifier)
+
+
+------------------------------------------------------------------------------
+ 2. PREMIER LANCEMENT (installation automatique, 5 à 15 minutes)
+------------------------------------------------------------------------------
+
+  AVEC L'INSTALLATEUR (recommandé) :
+     Double-cliquez sur FREE-Installation.exe, gardez le dossier proposé
+     (%LOCALAPPDATA%\Programs\FREE), cliquez sur « Installer » puis « Terminer ».
+     FREE est ajouté au menu Démarrer (et au Bureau si la case est cochée),
+     puis se lance tout seul : continuez à l'étape b).
+     Pour mettre à jour FREE plus tard, relancez simplement un nouvel
+     installateur : vos analyses et réglages sont conservés.
+
+  SANS INSTALLATEUR :
+     Placez le dossier FREE où vous voulez (pas dans OneDrive), puis :
+
+  a) Double-cliquez sur FREE.exe (ou sur FREE-Installation.exe).
+
+     Si Windows affiche « Windows a protégé votre ordinateur » :
+     cliquez sur « Informations complémentaires », puis « Exécuter quand même ».
+     C'est normal : FREE n'est pas signé numériquement (un certificat est
+     payant), donc Windows ne le connaît pas encore. FREE ne contient rien de
+     caché : son code est lisible dans le dossier ressources\app\.
+
+  b) FREE vérifie ce qui lui manque. La première fois, il propose de l'installer :
+     cliquez sur « Oui ». Une fenêtre s'ouvre et installe, dans l'ordre :
+       1/6 Node.js        (le moteur qui fait tourner FREE et REA)
+       2/6 Java 25        (nécessaire à Ghidra)
+       3/6 Ghidra 12.2+   (téléchargé depuis le site officiel sur GitHub)
+       4/6 Réglages       (indique à REA où sont Ghidra et Java)
+       5/6 REA            (l'outil de rétro-ingénierie)
+       6/6 Claude Code    (l'assistant qui mène les enquêtes et code)
+     Répondez O (oui) aux questions, puis fermez la fenêtre à la fin.
+     Aucun droit administrateur n'est nécessaire.
+
+  c) FREE démarre tout seul et s'ouvre dans sa propre fenêtre.
+
+  Si une étape échoue, le message dit quoi faire ; relancez simplement FREE.exe
+  pour reprendre. Un rapport est écrit dans ressources\installation-rapport.txt.
+
+
+------------------------------------------------------------------------------
+ 3. CONNECTER CLAUDE CODE (une seule fois, guidé dans FREE)
+------------------------------------------------------------------------------
+
+  Si Claude Code n'est pas installé ou pas connecté, FREE affiche une page
+  « Bienvenue dans FREE » avec deux boutons :
+
+  a) « Installer Claude Code » (si besoin, 1 à 2 minutes).
+  b) « Se connecter » : une fenêtre s'ouvre, puis une page dans le navigateur.
+     Connectez-vous avec votre compte Claude.
+     Si un code s'affiche, copiez-le avec son bouton « Copier », puis collez-le
+     dans la fenêtre avec un CLIC DROIT (ou Ctrl + Maj + V), et appuyez sur Entrée.
+     (Ctrl + V seul ne marche souvent pas dans cette fenêtre.)
+  c) FREE détecte tout seul la connexion : cliquez sur « C'est prêt, commencer ! ».
+
+  Vous pouvez aussi « Continuer sans Claude Code » (analyses seulement) et y
+  revenir plus tard en cliquant sur « Claude Code » en bas à gauche.
+
+  Rappel : Claude Code demande un abonnement Claude Pro, Max, Team ou Enterprise.
+
+
+------------------------------------------------------------------------------
+ 4. UTILISER FREE AU QUOTIDIEN
+------------------------------------------------------------------------------
+
+  - Lancez FREE depuis le menu Démarrer, le raccourci du Bureau ou FREE.exe.
+  - FREE s'ouvre dans sa fenêtre (adresse interne : http://localhost:4747).
+  - Il n'y a pas de fenêtre noire : FREE tourne en fond, avec son icône (une
+    loupe) près de l'horloge, en bas à droite. Si vous ne la voyez pas, cliquez
+    sur la petite flèche ^ à côté de l'horloge.
+      Double-clic sur l'icône ........ rouvre la fenêtre FREE   
+      Clic droit > Quitter FREE ...... sauvegarde puis arrête FREE
+      Clic droit > Voir le journal ... utile en cas de problème
+  - Vous pouvez aussi quitter avec « Quitter FREE (en sauvegardant) » en bas à
+    gauche de la page. FREE sauvegarde alors ce que Ghidra a calculé, pour aller
+    plus vite la prochaine fois.
+
+  En bas à gauche, trois voyants doivent être verts : REA, Ghidra, Claude Code.
+
+
+------------------------------------------------------------------------------
+ 5. UTILISER FREE
+------------------------------------------------------------------------------
+
+  Partout, les boutons « ? » expliquent simplement chaque étape.
+
+  CHOISIR QUOI ANALYSER (page « Nouvelle analyse »)
+    - Appli ouverte : FREE liste les applis ouvertes sur votre PC.
+    - Site web : collez l'adresse du site.
+    - Fichier : choisissez un .exe, une .dll ou un .asar.
+    Options :
+    - « Analyse profonde avec Ghidra » (applis natives) : décompile le programme.
+      Plus complet, mais de quelques minutes à plus d'une heure. Vous choisissez
+      le temps maximum (2 h par défaut).
+    - « Puis enquête automatique » (cochée par défaut) : à la fin, Claude Code
+      lance tout seul une enquête. Vous pouvez écrire la fonctionnalité qui vous
+      intéresse, ou laisser vide pour une vue générale.
+
+  Chaque analyse a ensuite TROIS ONGLETS :
+
+  ONGLET 🔬 ANALYSE
+    Les étapes de REA défilent avec une durée estimée et un chronomètre.
+    Cliquez sur une étape pour voir son résultat détaillé.
+
+  ONGLET 🔍 ENQUÊTES (10 à 40 min par question)
+    Posez une question sur une fonctionnalité : « Comment marche la sauvegarde ? »,
+    « Quelles informations sont envoyées sur Internet ? »... Claude Code fouille
+    avec les ~260 outils REA et écrit sa réponse, avec les preuves.
+    Chaque question garde sa fiche. Une enquête à la fois.
+
+  ONGLET 🏗️ RECONSTRUCTION
+    1. Plan (2 à 10 min) : Claude Code écrit PLAN.md à partir de l'analyse et de
+       TOUTES les enquêtes : ce que fait l'appli, comment elle est construite,
+       et comment en faire votre version. Pas encore de code.
+       Relisez-le, modifiez-le (bouton Modifier) ou régénérez-le avec des consignes.
+       Par défaut, la reconstruction est du même type que l'original
+       (un .exe donne une appli de bureau en .exe, un site donne un site),
+       sauf si vous demandez autre chose dans les consignes.
+    2. Reconstruire (10 à 45 min) : Claude Code code le projet en suivant le plan,
+       installe ce qu'il faut et vérifie qu'il démarre. Le bouton « Ouvrir »
+       montre le dossier du projet.
+    3. Faire évoluer (1 à 10 min par demande) : écrivez ce que vous voulez,
+       « passe en thème sombre », « ajoute un export PDF »... Claude Code s'en
+       souvient d'une demande à l'autre.
+
+
+------------------------------------------------------------------------------
+ 6. OÙ SONT LES FICHIERS
+------------------------------------------------------------------------------
+
+  Projets reconstruits ........ %USERPROFILE%\REA-Projets\
+  Analyses (résultats, plan) .. %LOCALAPPDATA%\FREE\data\analyses\
+  Sauvegardes Ghidra .......... %LOCALAPPDATA%\FREE\data\snapshots\
+  Ghidra ...................... %LOCALAPPDATA%\Programs\ghidra_...\
+
+  (Tapez ces chemins dans la barre d'adresse de l'Explorateur Windows.)
+
+
+------------------------------------------------------------------------------
+ 7. BON À SAVOIR
+------------------------------------------------------------------------------
+
+  - Les fichiers à analyser ne doivent PAS être dans OneDrive : REA les refuse.
+    Copiez l'appli dans un dossier local (par exemple C:\analyse\) si besoin.
+  - Une seule analyse Ghidra à la fois : les autres étapes Ghidra attendent leur
+    tour (FREE l'indique avec ⏸). Les étapes rapides, elles, n'attendent pas.
+  - Pour les jeux (Godot, Unity...), Ghidra analyse surtout le moteur du jeu :
+    une enquête avec une question précise est souvent plus utile.
+  - « Relancer l'analyse » refait l'analyse sur la même page ; le plan,
+    l'enquête et les projets sont gardés.
+
+
+  - MISES À JOUR : à chaque lancement, FREE vérifie s'il existe une nouvelle
+    version de REA ou de Ghidra. Si oui, un encadré bleu apparaît en bas à
+    gauche avec un bouton « Mettre à jour » :
+      REA    -> se met à jour tout seul en 1 à 2 minutes, sans quitter FREE.
+      Ghidra -> ouvre l'installateur, qui propose de télécharger la nouvelle
+                version (environ 500 Mo). Quand il a fini, quittez FREE et
+                relancez FREE.exe.
+    Rien n'est mis à jour sans votre accord, et jamais pendant une analyse.
+
+
+------------------------------------------------------------------------------
+ 8. PROBLÈMES FRÉQUENTS
+------------------------------------------------------------------------------
+
+  « Windows a protégé votre ordinateur » / antivirus méfiant
+      -> Voir partie 2 a). Si votre antivirus bloque FREE.exe, ajoutez une
+         exception pour le dossier FREE. (Il réagit parce que le programme est
+         nouveau et non signé, pas parce qu'il est dangereux.)
+
+  Voyant « Claude Code » orange ou rouge
+      -> Cliquez dessus : la page « Bienvenue » vous guide (partie 3).
+
+  Voyant « Ghidra » rouge, ou erreur Ghidra / Java
+      -> Relancez FREE.exe : il propose de réinstaller ce qui manque.
+         Le rapport est dans ressources\installation-rapport.txt.
+
+  FREE ne s'ouvre pas / s'arrête tout seul
+      -> Regardez ressources\journal.txt (démarrage de FREE) et, via clic droit
+         sur l'icône FREE > Voir le journal, %LOCALAPPDATA%\FREE\free.log.
+
+  « Selected artifact exceeds ... bytes »
+      -> Fichier très gros : FREE relance automatiquement avec la limite maximale.
+
+  « OutOfMemoryError: Java heap space »
+      -> Ghidra a manqué de mémoire. FREE lui en donne déjà environ 60 % de la
+         RAM : fermez les gros programmes (jeux, navigateur chargé) et relancez.
+
+  « Ghidra did not finish ... startup deadline »
+      -> Ghidra a manqué de temps : relancez avec un temps maximum plus long
+         (4 h ou 8 h) dans les options de l'analyse.
+
+  L'interface ne change pas après une mise à jour de FREE
+      -> Appuyez sur Ctrl + F5 dans l'onglet de FREE.
+
+  Le port 4747 est déjà utilisé
+      -> FREE est sans doute déjà ouvert : cherchez son icône près de l'horloge.
+
+
+------------------------------------------------------------------------------
+ 9. PARTAGER FREE AVEC QUELQU'UN
+------------------------------------------------------------------------------
+
+  Le plus simple : envoyez juste FREE-Installation.exe (un seul fichier,
+  il contient tout FREE). Joignez ce LISEZ-MOI.txt pour les explications.
+  Sinon, donnez le dossier FREE complet : FREE.exe, LISEZ-MOI.txt et
+  ressources\ (clic droit sur le dossier > Compresser en fichier ZIP).
+  N'ajoutez pas vos dossiers d'analyses ni vos projets si vous ne voulez pas
+  les partager (ils ne sont pas dans ce dossier de toute façon).
+  La personne suit simplement ce fichier à partir de la partie 1.
+
+
+------------------------------------------------------------------------------
+ 10. DÉSINSTALLER
+------------------------------------------------------------------------------
+
+  Installé avec FREE-Installation.exe :
+     Paramètres Windows > Applications > Applications installées > FREE >
+     Désinstaller. FREE est fermé proprement, ses fichiers et raccourcis sont
+     supprimés ; on vous demande si vous voulez aussi effacer l'historique des
+     analyses. Vos projets (%USERPROFILE%\REA-Projets) sont toujours gardés.
+
+  Dossier sans installation :
+  0. Quittez FREE (clic droit sur l'icône > Quitter FREE).
+  1. Supprimez ce dossier, le raccourci FREE du Bureau, et les dossiers
+     %LOCALAPPDATA%\FREE et (si vous voulez) %USERPROFILE%\REA-Projets.
+
+  Pour retirer aussi les outils installés pour FREE (dans les deux cas) :
+  - Dans un terminal :  npm uninstall -g rea-agents @anthropic-ai/claude-code
+  - Ghidra : supprimez %LOCALAPPDATA%\Programs\ghidra_...
+  - Java et Node.js : Paramètres Windows > Applications, si vous n'en avez plus besoin.
+
+
+------------------------------------------------------------------------------
+ UTILISATION RESPONSABLE
+------------------------------------------------------------------------------
+
+  Analysez uniquement des logiciels et des sites que vous avez le droit
+  d'analyser, et respectez leurs conditions d'utilisation. Les reconstructions
+  sont des versions originales : elles ne doivent reprendre ni le code, ni les
+  textes, ni les images, ni la marque des logiciels analysés.
+
+

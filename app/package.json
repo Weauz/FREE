@@ -1,0 +1,19 @@
+{
+  "name": "free",
+  "version": "1.0.0",
+  "updateRepo": "Weauz/FREE",
+  "private": true,
+  "description": "Interface graphique locale pour REA (Reverse Engineer Anything) + Claude Code",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "express": "5.3.0"
+  }
+}
