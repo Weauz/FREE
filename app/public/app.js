@@ -65,6 +65,13 @@ const HELP = {
     screenshot: "On prend une photo de la page, comme une capture d'écran.",
     page: "On regarde comment la page est construite : ses blocs, ses images et tout ce qu'elle télécharge.",
     bundle: "On lit le code JavaScript du site pour trouver ses pages et les serveurs avec qui il discute.",
+    'pck-file': "Un jeu Godot range tout son contenu dans un gros paquet. On le sort du .exe pour pouvoir l'ouvrir, comme sortir les jouets d'une boîte.",
+    'pck-open': "On ouvre le paquet du jeu pour regarder dedans.",
+    'pck-inventory': "On fait la liste de tout ce qu'il y a dans le paquet : les scripts (les règles du jeu), les scènes (les écrans) et les images.",
+    gdre: "Un outil spécial traduit les scripts du jeu pour qu'on puisse les lire, comme traduire un livre écrit dans une langue secrète.",
+    il2cpp: "Dans un jeu Unity, un fichier garde le nom de toutes les pièces du jeu. On le lit pour connaître chaque classe et chaque fonction.",
+    managed: "Ce programme est écrit en C# : on peut lire directement la liste de ses classes et de ses fonctions, avec leurs vrais noms.",
+    managed2: "Une deuxième partie du code C# du jeu.",
   },
 };
 // Durees estimees des etapes Claude Code (secondes) et chrono en direct quand elles tournent
@@ -458,6 +465,7 @@ async function renderAnalysis(id) {
 
     <section data-apanel="analyse">
       <h2>Analyse REA ${help(HELP.analyse)} <span id="eta" style="font-size:13px;font-weight:400"></span></h2>
+      ${runtimeBox(a)}
       <div class="steps" id="steps"></div>
       <div class="callout info" style="margin-top:16px"><span>🔍</span><div class="small">Pour comprendre une fonctionnalité précise (« comment marche la recherche ? »), ouvrez l'onglet <a href="#" data-goto="enquetes" style="color:var(--accent)">Enquêtes</a>. Pour créer votre version de l'appli, ouvrez l'onglet <a href="#" data-goto="recon" style="color:var(--accent)">Reconstruction</a>.</div></div>
     </section>
@@ -487,6 +495,18 @@ async function renderAnalysis(id) {
   $('#rerun').onclick = async () => {
     try { await api(`/analyses/${id}/rerun`, { body: {} }); openSteps.clear(); renderAnalysis(id); refreshSidebar(); } catch (e) { toast(e.message); }
   };
+  const rerunWith = async (extra) => { try { await api(`/analyses/${id}/rerun`, { body: extra }); openSteps.clear(); renderAnalysis(id); refreshSidebar(); } catch (e) { toast(e.message); } };
+  $('#rt-gdre') && ($('#rt-gdre').onclick = () => {
+    if (!confirm('Récupérer les scripts du jeu avec GDRE Tools ?\n\n' +
+      '• GDRE Tools est gratuit et open source (licence MIT). Il sera téléchargé depuis GitHub la première fois (quelques dizaines de Mo).\n' +
+      '• Les scripts récupérés restent sur votre PC, dans le dossier de l\'analyse (jeu-recupere).\n\n' +
+      'Rappel : servez-vous-en pour comprendre le jeu, pas pour recopier son code, ses images ou ses textes.')) return;
+    rerunWith({ gdre: true });
+  });
+  $('#rt-ghidra') && ($('#rt-ghidra').onclick = () => {
+    if (!confirm('Lancer quand même l\'analyse approfondie Ghidra ?\n\nPour ce type de programme, Ghidra analyse surtout le moteur ou l\'interpréteur : c\'est très long (parfois plus d\'une heure) et apporte peu d\'informations sur la logique du programme.')) return;
+    rerunWith({ forceGhidra: true });
+  });
   $('#folder').onclick = () => api('/open-folder', { body: { path: a.dir } }).catch((e) => toast(e.message));
   $('#del').onclick = async () => {
     if (!confirm('Supprimer cette analyse et ses résultats ?')) return;
@@ -497,6 +517,19 @@ async function renderAnalysis(id) {
   renderPlan(a, analysisDone, claudeOk);
   renderBuild(a, claudeOk);
   renderChange(a, claudeOk);
+}
+
+// Type de programme detecte (jeu Godot, Unity, .NET...) : explique pourquoi Ghidra est evite et propose les bons outils.
+function runtimeBox(a) {
+  const rt = a.target.runtime;
+  if (!rt || rt.id === 'native') return '';
+  const busy = a.status === 'running' || a.status === 'queued';
+  const btns = [];
+  if (rt.id === 'godot' && !a.options?.gdre) btns.push(`<button class="btn small primary" id="rt-gdre" ${busy ? 'disabled' : ''}>📜 Récupérer les scripts du jeu</button>`);
+  if (!rt.ghidraUseful && !a.options?.forceGhidra) btns.push(`<button class="btn small ghost" id="rt-ghidra" ${busy ? 'disabled' : ''} title="Déconseillé pour ce type de programme">Lancer quand même Ghidra</button>`);
+  return `<div class="callout info rt-box"><span>🧩</span><div class="small"><b>${esc(rt.label)} détecté.</b> ${esc(rt.why)}<br>${esc(rt.advice)}
+    ${!rt.ghidraUseful && a.options?.deep && !a.options?.forceGhidra ? '<br><i>L\'analyse approfondie Ghidra a donc été remplacée par ces outils.</i>' : ''}
+    ${btns.length ? `<div class="row" style="margin-top:8px;gap:8px">${btns.join('')}</div>` : ''}</div></div>`;
 }
 
 function renderSteps(a) {

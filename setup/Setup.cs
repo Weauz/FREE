@@ -18,12 +18,12 @@ using Microsoft.Win32;
 [assembly: AssemblyCompany("NetLance")]
 [assembly: AssemblyProduct("FREE")]
 [assembly: AssemblyCopyright("© 2026 NetLance")]
-[assembly: AssemblyVersion("1.2.0.0")]
-[assembly: AssemblyFileVersion("1.2.0.0")]
+[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyFileVersion("1.3.0.0")]
 
 static class Setup
 {
-    public const string Version = "1.2.0";
+    public const string Version = "1.3.0";
     public const string UninstKey = @"Software\Microsoft\Windows\CurrentVersion\Uninstall\FREE";
     public const string UninstExe = "Desinstaller-FREE.exe";
     public static readonly Color Blue = Color.FromArgb(36, 80, 214);

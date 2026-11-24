@@ -128,7 +128,7 @@ function deliverableRule(t) {
 const PLAN_PROMPT = (meta) => `Tu travailles dans le dossier d'une analyse de rétro-ingénierie faite avec REA.
 Cible analysee : ${meta.target.name || meta.target.url} (type : ${meta.target.kind}).
 
-1. Lis resume-analyse.md et toutes les enquetes : enquetes/*/ENQUETE.md (et ENQUETE.md s'il existe) ; ce sont les sources les plus riches, chacune explique une fonctionnalite. Puis les fichiers steps/*.json utiles (ils peuvent être gros : utilise Grep et lis par morceaux).
+1. Lis resume-analyse.md et toutes les enquetes : enquetes/*/ENQUETE.md (et ENQUETE.md s'il existe) ; ce sont les sources les plus riches, chacune explique une fonctionnalite. Puis les fichiers steps/*.json utiles (ils peuvent être gros : utilise Grep et lis par morceaux). Si le dossier jeu-recupere/ existe (scripts d'un jeu Godot récupérés), lis ses scripts .gd principaux : c'est la vraie logique du jeu. Sers-t'en pour comprendre les mécanismes, sans recopier leur code, leurs textes ni leurs images.
 2. Écris un fichier PLAN.md en français avec ces sections :
    - Ce que fait l'appli (fonctionnalités observées, avec la preuve : quel fichier/etape)
    - Architecture deduite (technologies, structure, flux de données, API/endpoints, stockage)
@@ -303,7 +303,7 @@ const DEEP_PROMPT = (meta, focus, eid) => {
 Cible : ${t.name || t.url} (type : ${t.kind}).
 ${where}
 
-Une premiere analyse automatique est deja faite : lis resume-analyse.md (et steps/*.json au besoin).
+Une premiere analyse automatique est deja faite : lis resume-analyse.md (et steps/*.json au besoin). Si le dossier jeu-recupere/ existe, il contient les scripts .gd du jeu (Godot) : cherche-y la fonctionnalité demandée (Grep).
 D'autres enquetes ont peut-etre deja ete faites (enquetes/*/ENQUETE.md, ENQUETE.md) : lis-les pour ne pas refaire le meme travail. Si preuves-rea.json existe et que binary_session ne montre pas ces preuves, tu peux les recharger avec import_evidence_bundle (chemin absolu : ${path.join(DIR, 'preuves-rea.json')}).
 ${focus
   ? `QUESTION DE L'UTILISATEUR : ${focus}\nTa mission : repondre precisement a cette question. Trouve ou et comment cette fonctionnalite est realisee (fichiers, fonctions, donnees, reseau), avec les preuves REA. Reste concentre sur cette question.`

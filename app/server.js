@@ -83,7 +83,7 @@ app.get('/api/analyses/:id', wrap((req) => {
     },
   };
 }));
-app.post('/api/analyses/:id/rerun', wrap((req) => rerunAnalysis(req.params.id)));
+app.post('/api/analyses/:id/rerun', wrap((req) => rerunAnalysis(req.params.id, req.body || {})));
 app.get('/api/analyses/:id/steps/:step', wrap((req) => getStepResult(req.params.id, req.params.step)));
 app.get('/api/analyses/:id/file/:name', (req, res) => {
   const name = path.basename(req.params.name);
