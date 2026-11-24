@@ -1,6 +1,11 @@
 # installer-rea.ps1 - installe tout ce qu'il faut pour FREE (REA + Ghidra + Java + Claude Code)
 # Lance automatiquement par FREE.exe quand un composant manque. Aucun droit administrateur requis.
 # Le script peut etre relance sans risque : ce qui est deja installe est garde.
+#   -Auto           : pas de questions (FREE.exe a deja demande l'accord dans sa fenetre)
+#   -Java temurin   : Eclipse Temurin 25 LTS (gratuit, open source) - par defaut
+#   -Java oracle    : Oracle JDK 25 LTS (gratuit sous licence Oracle NFTC)
+#   -NoClaude       : ne pas installer Claude Code
+param([switch]$Auto, [ValidateSet('temurin', 'oracle')][string]$Java = 'temurin', [switch]$NoClaude)
 
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
@@ -10,8 +15,9 @@ $log = Join-Path $root 'installation-rapport.txt'
 function Step($t) { Write-Host ""; Write-Host "=== $t ===" -ForegroundColor Cyan }
 function Ok($t)   { Write-Host "  [OK] $t" -ForegroundColor Green }
 function Warn($t) { Write-Host "  [!]  $t" -ForegroundColor Yellow }
-function Fail($t) { Write-Host "  [X]  $t" -ForegroundColor Red; Read-Host "Appuyez sur Entree pour quitter"; exit 1 }
-function AskYes($q) { $r = Read-Host "$q (O/N)"; return ($r -match '^[OoYy]') }
+function Fail($t) { Write-Host "  [X]  $t" -ForegroundColor Red; if (-not $Auto) { Read-Host "Appuyez sur Entree pour quitter" }; exit 1 }
+function AskYes($q) { if ($Auto) { Write-Host "  $q -> oui"; return $true }; $r = Read-Host "$q (O/N)"; return ($r -match '^[OoYy]') }
+$wingetFlags = @('-e', '--accept-package-agreements', '--accept-source-agreements', '--disable-interactivity')
 function HasCmd($c) { [bool](Get-Command $c -ErrorAction SilentlyContinue) }
 function RefreshPath {
     $env:Path = [Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [Environment]::GetEnvironmentVariable('Path', 'User')
@@ -33,7 +39,7 @@ function NodeOk {
 if (-not (NodeOk)) {
     Warn "Node.js absent ou trop ancien (il faut 22.23.4+, 24.22.1+ ou 26.12.1+)."
     if ((HasCmd winget) -and (AskYes "Installer Node.js LTS avec winget ?")) {
-        winget install --id OpenJS.NodeJS.LTS -e --accept-package-agreements --accept-source-agreements
+        winget install --id OpenJS.NodeJS.LTS @wingetFlags
         RefreshPath
     }
     if (-not (NodeOk)) { Fail "Installez Node.js LTS depuis https://nodejs.org (bouton LTS), puis relancez FREE." }
@@ -61,11 +67,16 @@ function Find-Jdk {
 $jdk = Find-Jdk
 if (-not $jdk) {
     Warn "Aucun JDK 25+ trouve."
-    if ((HasCmd winget) -and (AskYes "Installer Java (Eclipse Temurin JDK 25) avec winget ?")) {
-        winget install --id EclipseAdoptium.Temurin.25.JDK -e --accept-package-agreements --accept-source-agreements
+    if ($Java -eq 'oracle') { $jdkId = 'Oracle.JDK.25'; $jdkName = 'Oracle JDK 25 (gratuit, licence Oracle NFTC)' }
+    else { $jdkId = 'EclipseAdoptium.Temurin.25.JDK'; $jdkName = 'Eclipse Temurin JDK 25 (gratuit, open source)' }
+    if ((HasCmd winget) -and (AskYes "Installer $jdkName avec winget ?")) {
+        winget install --id $jdkId @wingetFlags
         $jdk = Find-Jdk
     }
-    if (-not $jdk) { Fail "Installez un JDK 25 : https://adoptium.net (Temurin 25, JDK, Windows x64, .msi), puis relancez FREE." }
+    if (-not $jdk) {
+        if ($Java -eq 'oracle') { Fail "Installez Oracle JDK 25 : https://www.oracle.com/java/technologies/downloads/ (JDK 25, Windows, x64 MSI Installer), puis relancez FREE." }
+        Fail "Installez un JDK 25 : https://adoptium.net (Temurin 25, JDK, Windows x64, .msi), puis relancez FREE."
+    }
 }
 Ok "JDK $(Get-JdkMajor $jdk) : $jdk"
 
@@ -128,6 +139,8 @@ if (-not $ghidra) {
     if (-not (AskYes "Telecharger Ghidra $($latest.v) ($sizeMb Mo) depuis GitHub ?")) { Fail "Installation de Ghidra annulee." }
     $ghidra = Install-Ghidra $latest
     if (-not $ghidra) { Fail "Ghidra telecharge mais introuvable apres decompression dans $programs." }
+} elseif ($latest -and $latest.v -gt (GhidraVersion $ghidra) -and $Auto) {
+    Ok "Ghidra $($latest.v) est disponible : FREE vous proposera la mise a jour."
 } elseif ($latest -and $latest.v -gt (GhidraVersion $ghidra)) {
     $sizeMb = [math]::Round($latest.asset.size / 1MB)
     Warn "Une nouvelle version de Ghidra existe : $(GhidraVersion $ghidra) -> $($latest.v)"
@@ -162,7 +175,7 @@ if ($LASTEXITCODE -eq 0) { Ok "REA trouve Ghidra et Java." } else { Warn "REA si
 Step "6/6 Claude Code (pour le plan, la reconstruction et l'enquete)"
 RefreshPath
 $hasClaude = (HasCmd claude) -or (Test-Path (Join-Path $env:USERPROFILE '.local\bin\claude.exe'))
-if (-not $hasClaude) {
+if (-not $hasClaude -and -not $NoClaude) {
     if (AskYes "Installer Claude Code ? (necessite un abonnement Claude Pro, Max, Team ou Enterprise)") {
         & npm.cmd install --global @anthropic-ai/claude-code --no-audit --no-fund
         RefreshPath
@@ -177,5 +190,8 @@ if ($hasClaude) {
 
 Write-Host ""
 Write-Host "=== Installation terminee ===" -ForegroundColor Green
-Write-Host "FREE va demarrer des que vous fermez cette fenetre (un raccourci FREE est cree sur le Bureau)." -ForegroundColor Green
-Read-Host "Appuyez sur Entree pour fermer"
+if (-not $Auto) {
+    Write-Host "FREE va demarrer des que vous fermez cette fenetre." -ForegroundColor Green
+    Read-Host "Appuyez sur Entree pour fermer"
+}
+exit 0

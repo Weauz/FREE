@@ -23,8 +23,8 @@ using System.IO.Compression;
 [assembly: AssemblyProduct("FREE")]
 [assembly: AssemblyCompany("NetLance")]
 [assembly: AssemblyCopyright("© 2026 NetLance")]
-[assembly: AssemblyVersion("1.0.0.0")]
-[assembly: AssemblyFileVersion("1.0.0.0")]
+[assembly: AssemblyVersion("1.1.0.0")]
+[assembly: AssemblyFileVersion("1.1.0.0")]
 
 static class FreeLauncher
 {
@@ -45,6 +45,8 @@ static class FreeLauncher
     static string InstallerScript { get { string p = Path.Combine(Res, "installation", "installer-rea.ps1"); return File.Exists(p) ? p : Path.Combine(ExeDir, "Installation", "installer-rea.ps1"); } }
 
     // Journal de demarrage, a cote de FREE.exe (utile pour comprendre un probleme)
+    public static string InstallerScriptPath { get { return InstallerScript; } }
+    public static void Note(string msg) { Trace(msg); }
     static void Trace(string msg)
     {
         try { File.AppendAllText(TraceFile, DateTime.Now.ToString("HH:mm:ss") + "  " + msg + "\r\n"); } catch { }
@@ -103,12 +105,8 @@ static class FreeLauncher
         Trace("Composants manquants : " + (missing == null ? "aucun" : missing.Replace("\n", " ")));
         if (missing != null)
         {
-            var r = Box(
-                "Bienvenue dans FREE !\n\nAvant la première utilisation, FREE doit installer ce qui lui manque :\n" + missing +
-                "\n\nUne fenêtre va s'ouvrir et vous guider (5 à 15 minutes, connexion Internet nécessaire). Répondez O (oui) aux questions.\n\nLancer l'installation maintenant ?",
-                MessageBoxButtons.YesNo, MessageBoxIcon.Information);
-            if (r != DialogResult.Yes) return;
-            RunInstaller(true);
+            // Fenetre d'installation : liste de ce qui manque, choix du Java gratuit, accord de l'utilisateur.
+            if (!SetupWindow.Run()) { Trace("Installation des composants annulée ou incomplète."); return; }
             RefreshEnvironment();
             missing = MissingComponents();
             if (missing != null)
@@ -198,7 +196,7 @@ static class FreeLauncher
     }
 
     // ---------- Composants
-    static string MissingComponents()
+    public static string MissingComponents()
     {
         var sb = new StringBuilder();
         string node = Which("node.exe");
@@ -221,7 +219,7 @@ static class FreeLauncher
     }
 
     // Recharge PATH et les variables du compte (une installation vient peut-etre de les changer)
-    static void RefreshEnvironment()
+    public static void RefreshEnvironment()
     {
         string machine = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.Machine) ?? "";
         string user = Environment.GetEnvironmentVariable("Path", EnvironmentVariableTarget.User) ?? "";
@@ -235,7 +233,7 @@ static class FreeLauncher
         Environment.SetEnvironmentVariable("FREE_NO_BROWSER", "1");
     }
 
-    static string Which(string exe)
+    public static string Which(string exe)
     {
         foreach (var dir in (Environment.GetEnvironmentVariable("Path") ?? "").Split(new char[] { ';' }))
         {
@@ -609,5 +607,198 @@ static class FreeLauncher
         st.InvokeMember("Description", BindingFlags.SetProperty, null, sc, new object[] { "FREE - French Reverse Engineer Everything" });
         st.InvokeMember("IconLocation", BindingFlags.SetProperty, null, sc, new object[] { Application.ExecutablePath + ",0" });
         st.InvokeMember("Save", BindingFlags.InvokeMethod, null, sc, null);
+    }
+}
+
+// ---------------------------------------------------------------------------------------------
+// Premier lancement : fenetre qui installe ce qui manque (Node.js, Java, Ghidra, REA, Claude Code).
+// Tout est gratuit ; pour Java, l'utilisateur choisit entre Eclipse Temurin (open source) et Oracle JDK.
+class SetupWindow : Form
+{
+    class Item { public string Name, Desc; public bool Ok; public Label State; }
+
+    readonly List<Item> items = new List<Item>();
+    RadioButton temurin, oracle;
+    CheckBox claudeBox;
+    Button go, cancel;
+    TextBox log;
+    Label stepLabel;
+    ProgressBar bar;
+    Process proc;
+    bool running, success;
+
+    static readonly Color Blue = Color.FromArgb(36, 80, 214), Ink = Color.FromArgb(31, 35, 40), Muted = Color.FromArgb(101, 109, 118), Green = Color.FromArgb(26, 127, 55);
+
+    public static bool Run()
+    {
+        using (var f = new SetupWindow()) { f.ShowDialog(); return f.success; }
+    }
+
+    static bool JavaOk()
+    {
+        string j = Environment.GetEnvironmentVariable("JAVA_HOME");
+        return !string.IsNullOrEmpty(j) && File.Exists(Path.Combine(j, "bin\\java.exe"));
+    }
+    static bool GhidraOk()
+    {
+        string g = Environment.GetEnvironmentVariable("GHIDRA_INSTALL_DIR");
+        return !string.IsNullOrEmpty(g) && File.Exists(Path.Combine(g, "Ghidra\\application.properties"));
+    }
+    static bool ReaOk()
+    {
+        string npmRoot = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "npm\\node_modules");
+        return File.Exists(Path.Combine(npmRoot, "rea-agents\\package.json"));
+    }
+    static bool ClaudeOk()
+    {
+        return FreeLauncher.Which("claude.cmd") != null || FreeLauncher.Which("claude.exe") != null ||
+               File.Exists(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".local\\bin\\claude.exe"));
+    }
+
+    Label L(string text, float size, FontStyle style, Color color, int x, int y, int w)
+    {
+        var l = new Label { Text = text, Font = new Font("Segoe UI", size, style), ForeColor = color, Location = new Point(x, y), AutoSize = w == 0 };
+        if (w > 0) { l.Size = new Size(w, (int)(size * 2.2f)); l.AutoEllipsis = true; }
+        Controls.Add(l);
+        return l;
+    }
+
+    SetupWindow()
+    {
+        Text = "FREE - Installation des outils";
+        try { Icon = Icon.ExtractAssociatedIcon(Application.ExecutablePath); } catch { }
+        FormBorderStyle = FormBorderStyle.FixedDialog; MaximizeBox = false;
+        StartPosition = FormStartPosition.CenterScreen; AutoScaleMode = AutoScaleMode.Dpi;
+        ClientSize = new Size(680, 640); BackColor = Color.White; Font = new Font("Segoe UI", 9.5f);
+
+        L("Bienvenue dans FREE 👋", 16f, FontStyle.Bold, Ink, 24, 18, 0);
+        L("Avant la première utilisation, FREE doit installer quelques outils. Tous sont gratuits.\n" +
+          "Comptez 5 à 15 minutes avec une connexion Internet. Aucun droit administrateur n'est nécessaire,\n" +
+          "mais Windows peut demander « Voulez-vous autoriser… » : répondez Oui.", 9.5f, FontStyle.Regular, Muted, 26, 58, 0);
+
+        int y = 124;
+        Add("Node.js", "Le moteur qui fait tourner FREE et REA", FreeLauncher.Which("node.exe") != null, ref y);
+        Add("Java (JDK 25)", "Nécessaire à Ghidra", JavaOk(), ref y);
+        // Choix du Java gratuit, juste sous la ligne Java
+        temurin = new RadioButton { Text = "Eclipse Temurin 25 : gratuit et open source, sans conditions (recommandé)", Checked = true, AutoSize = true, Location = new Point(56, y - 4) };
+        oracle = new RadioButton { Text = "Oracle JDK 25 : gratuit sous licence Oracle (NFTC)", AutoSize = true, Location = new Point(56, y + 20) };
+        var lic = new LinkLabel { Text = "voir la licence", AutoSize = true, Location = new Point(370, y + 22), LinkColor = Blue };
+        lic.LinkClicked += (s, e) => { try { Process.Start("https://www.oracle.com/downloads/licenses/no-fee-license.html"); } catch { } };
+        Controls.Add(temurin); Controls.Add(oracle); Controls.Add(lic);
+        lic.Left = oracle.Left + oracle.PreferredSize.Width + 8;
+        bool javaOk = JavaOk();
+        temurin.Enabled = oracle.Enabled = !javaOk;
+        y += 50;
+        Add("Ghidra", "L'outil de décompilation de la NSA (open source), téléchargé depuis GitHub", GhidraOk(), ref y);
+        Add("REA", "Reverse Engineer Anything : l'outil d'analyse", ReaOk(), ref y);
+        bool cOk = ClaudeOk();
+        Add("Claude Code", "Pour les enquêtes, le plan et la reconstruction (abonnement Claude requis)", cOk, ref y);
+        claudeBox = new CheckBox { Text = "Installer Claude Code", Checked = !cOk, Enabled = !cOk, AutoSize = true, Location = new Point(56, y - 6) };
+        Controls.Add(claudeBox);
+        y += 28;
+
+        stepLabel = L("", 9.5f, FontStyle.Bold, Ink, 24, y, 630);
+        bar = new ProgressBar { Location = new Point(26, y + 24), Size = new Size(628, 12), Maximum = 7, Visible = false };
+        Controls.Add(bar);
+        log = new TextBox { Multiline = true, ReadOnly = true, ScrollBars = ScrollBars.Vertical, Location = new Point(26, y + 44), Size = new Size(628, 560 - (y + 44)),
+                            Font = new Font("Consolas", 8.5f), BackColor = Color.FromArgb(246, 248, 250), BorderStyle = BorderStyle.FixedSingle, Visible = false };
+        Controls.Add(log);
+
+        go = new Button { Text = "Installer", Size = new Size(130, 36), Location = new Point(524, 586), BackColor = Blue, ForeColor = Color.White, FlatStyle = FlatStyle.Flat, Font = new Font("Segoe UI", 10f, FontStyle.Bold) };
+        go.FlatAppearance.BorderSize = 0;
+        cancel = new Button { Text = "Plus tard", Size = new Size(110, 36), Location = new Point(404, 586), FlatStyle = FlatStyle.System };
+        Controls.Add(go); Controls.Add(cancel);
+        AcceptButton = go;
+        go.Click += (s, e) => { if (success) Close(); else Start(); };
+        cancel.Click += (s, e) => Close();
+        FormClosing += (s, e) =>
+        {
+            if (!running) return;
+            if (MessageBox.Show(this, "L'installation est en cours. L'arrêter ?", "FREE", MessageBoxButtons.YesNo, MessageBoxIcon.Warning) != DialogResult.Yes) { e.Cancel = true; return; }
+            try { proc.Kill(); } catch { }
+        };
+    }
+
+    void Add(string name, string desc, bool ok, ref int y)
+    {
+        var it = new Item { Name = name, Desc = desc, Ok = ok };
+        L(name, 10f, FontStyle.Bold, Ink, 30, y, 0);
+        L(desc, 9f, FontStyle.Regular, Muted, 30, y + 22, 470);
+        it.State = L(ok ? "✓ Déjà installé" : "À installer · gratuit", 9f, FontStyle.Bold, ok ? Green : Blue, 510, y + 2, 150);
+        items.Add(it);
+        y += 52;
+    }
+
+    void Append(string line)
+    {
+        if (line == null) return;
+        // Enleve les barres de progression et caracteres de controle de winget
+        var sb = new StringBuilder();
+        foreach (char c in line) if (c >= ' ' && c < 0x2580) sb.Append(c);
+        string t = sb.ToString().Trim();
+        if (t.Length < 2 || t.Trim(new char[] { '-', '\\', '|', '/', ' ' }).Length == 0) return;
+        BeginInvoke((Action)(() =>
+        {
+            log.AppendText(t + "\r\n");
+            if (t.StartsWith("=== ") && t.Contains("/6"))
+            {
+                stepLabel.Text = "Étape " + t.Trim(new char[] { '=', ' ' });
+                int n; if (int.TryParse(t.Substring(4, 1), out n)) bar.Value = Math.Min(bar.Maximum, n);
+            }
+        }));
+    }
+
+    void Start()
+    {
+        if (oracle.Checked && oracle.Enabled &&
+            MessageBox.Show(this, "Oracle JDK 25 est gratuit sous la licence Oracle « No-Fee Terms and Conditions » (NFTC), y compris en usage professionnel, " +
+                "pour les mises à jour publiées jusqu'en septembre 2028.\n\nEn continuant, vous acceptez cette licence. Continuer ?",
+                "Licence Oracle", MessageBoxButtons.YesNo, MessageBoxIcon.Information) != DialogResult.Yes) return;
+
+        string ps1 = FreeLauncher.InstallerScriptPath;
+        if (!File.Exists(ps1)) { MessageBox.Show(this, "Script d'installation introuvable :\n" + ps1, "FREE", MessageBoxButtons.OK, MessageBoxIcon.Error); return; }
+        string args = "-NoProfile -ExecutionPolicy Bypass -File \"" + ps1 + "\" -Auto -Java " + (oracle.Checked ? "oracle" : "temurin") + (claudeBox.Checked ? "" : " -NoClaude");
+
+        running = true;
+        go.Enabled = false; cancel.Enabled = false; temurin.Enabled = oracle.Enabled = claudeBox.Enabled = false;
+        bar.Visible = true; log.Visible = true; bar.Value = 0;
+        stepLabel.Text = "Démarrage de l'installation…";
+        var psi = new ProcessStartInfo("powershell.exe", args)
+        {
+            UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
+            WorkingDirectory = Path.GetDirectoryName(ps1),
+        };
+        proc = new Process { StartInfo = psi, EnableRaisingEvents = true };
+        proc.OutputDataReceived += (s, e) => Append(e.Data);
+        proc.ErrorDataReceived += (s, e) => Append(e.Data);
+        proc.Exited += (s, e) => BeginInvoke((Action)Finished);
+        proc.Start();
+        proc.BeginOutputReadLine(); proc.BeginErrorReadLine();
+        FreeLauncher.Note("Installation des composants lancée : " + args);
+    }
+
+    void Finished()
+    {
+        running = false;
+        int code = -1; try { code = proc.ExitCode; } catch { }
+        FreeLauncher.Note("Installation des composants terminée, code " + code + ".");
+        try { File.WriteAllText(Path.Combine(Path.GetDirectoryName(FreeLauncher.InstallerScriptPath), "..\\installation-journal.txt"), log.Text); } catch { }
+        FreeLauncher.RefreshEnvironment();
+        bool allOk = FreeLauncher.MissingComponents() == null;
+        if (code == 0 && allOk)
+        {
+            success = true;
+            bar.Value = bar.Maximum;
+            stepLabel.ForeColor = Green;
+            stepLabel.Text = "✓ Tout est installé ! FREE va démarrer.";
+            go.Text = "Démarrer FREE"; go.Enabled = true;
+            go.Focus();
+        }
+        else
+        {
+            stepLabel.ForeColor = Color.FromArgb(207, 34, 46);
+            stepLabel.Text = "L'installation n'a pas abouti : lisez les dernières lignes ci-dessous.";
+            go.Text = "Réessayer"; go.Enabled = true; cancel.Enabled = true; cancel.Text = "Fermer";
+        }
     }
 }

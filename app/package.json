@@ -1,6 +1,6 @@
 {
   "name": "free",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "updateRepo": "Weauz/FREE",
   "private": true,
   "description": "Interface graphique locale pour REA (Reverse Engineer Anything) + Claude Code",

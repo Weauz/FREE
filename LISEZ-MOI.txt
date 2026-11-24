@@ -62,21 +62,23 @@ Aucun droit administrateur n'est nécessaire.
      payant), donc Windows ne le connaît pas encore. FREE ne contient rien de
      caché : son code est lisible dans le dossier ressources\app\.
 
-  b) FREE vérifie ce qui lui manque. La première fois, il propose de l'installer :
-     cliquez sur « Oui ». Une fenêtre s'ouvre et installe, dans l'ordre :
-       1/6 Node.js        (le moteur qui fait tourner FREE et REA)
-       2/6 Java 25        (nécessaire à Ghidra)
-       3/6 Ghidra 12.2+   (téléchargé depuis le site officiel sur GitHub)
-       4/6 Réglages       (indique à REA où sont Ghidra et Java)
-       5/6 REA            (l'outil de rétro-ingénierie)
-       6/6 Claude Code    (l'assistant qui mène les enquêtes et code)
-     Répondez O (oui) aux questions, puis fermez la fenêtre à la fin.
+  b) FREE vérifie ce qui lui manque. La première fois, une fenêtre « Bienvenue
+     dans FREE » liste les outils à installer (tous gratuits) :
+       Node.js        le moteur qui fait tourner FREE et REA
+       Java (JDK 25)  nécessaire à Ghidra. Vous choisissez :
+                        - Eclipse Temurin 25 : gratuit et open source (recommandé)
+                        - Oracle JDK 25 : gratuit sous licence Oracle (NFTC)
+       Ghidra         l'outil de décompilation (téléchargé depuis GitHub)
+       REA            l'outil de rétro-ingénierie
+       Claude Code    l'assistant qui mène les enquêtes et code (case à cocher)
+     Cliquez sur « Installer » : tout s'installe tout seul, avec la progression
+     affichée. Si Windows demande « Voulez-vous autoriser… », répondez Oui.
      Aucun droit administrateur n'est nécessaire.
 
   c) FREE démarre tout seul et s'ouvre dans sa propre fenêtre.
 
-  Si une étape échoue, le message dit quoi faire ; relancez simplement FREE.exe
-  pour reprendre. Un rapport est écrit dans ressources\installation-rapport.txt.
+  Si une étape échoue, le message dit quoi faire : cliquez sur « Réessayer » ou
+  relancez FREE. Le détail est écrit dans ressources\installation-journal.txt.
 
 
 ------------------------------------------------------------------------------
