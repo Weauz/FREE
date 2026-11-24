@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { EventEmitter } from 'node:events';
 import { config } from './config.js';
-import { callRea, callReaRaw, hasSnapshot, reaBusy } from './rea.js';
+import { callRea, callReaRaw, hasSnapshot, reaBusy, restartRea, isLightMode, ghidraMemGb, ramGb } from './rea.js';
 import { openUrlTarget } from './system.js';
 
 export const bus = new EventEmitter();
@@ -202,7 +202,9 @@ async function runAnalysis(meta) {
   meta.status = 'running';
   save(meta); emit(meta);
   let ghidraFailed = null;
-  for (const def of defs) {
+  let lightRetried = false;
+  for (let i = 0; i < defs.length; i++) {
+    const def = defs[i];
     const step = meta.steps.find((x) => x.id === def.id);
     // Si Ghidra n'a pas reussi a demarrer, inutile de relancer un import complet pour chaque etape.
     if (def.ghidra && ghidraFailed) {
@@ -263,7 +265,26 @@ async function runAnalysis(meta) {
       step.status = 'error';
       step.error = e.message;
     }
-    if (def.ghidra && step.status === 'error' && /ghidra|startup|deadline/i.test(step.error || '')) ghidraFailed = step.id;
+    // Ghidra a manque de memoire : on relance REA en mode allege et on reprend les etapes Ghidra depuis le debut.
+    if (def.ghidra && step.status === 'error' && /OutOfMemoryError|heap space|GC overhead/i.test(step.error || '') && !lightRetried && !isLightMode()) {
+      lightRetried = true;
+      const before = ghidraMemGb();
+      try {
+        await restartRea({ light: true });
+        const first = defs.findIndex((d) => d.ghidra);
+        for (let k = first; k <= i; k++) {
+          const st = meta.steps.find((x) => x.id === defs[k].id);
+          if (!defs[k].ghidra) continue;
+          if (k === i) st.firstError = st.error;
+          st.status = 'pending'; delete st.error; delete st.summary; delete st.durationMs; delete st.startedAt;
+        }
+        step.note = `Ghidra a manqué de mémoire avec ${before} Go. Nouvel essai automatique en mode allégé : ${ghidraMemGb()} Go sur ${ramGb()} Go de RAM, et les analyses Ghidra les plus gourmandes désactivées (résultat un peu moins détaillé).`;
+        save(meta); emit(meta);
+        i = first - 1;
+        continue;
+      } catch (e) { step.error += `\n(Nouvel essai en mode allégé impossible : ${e.message})`; }
+    }
+    if (def.ghidra && step.status === 'error' && /ghidra|startup|deadline|memory/i.test(step.error || '')) ghidraFailed = step.id;
     step.durationMs = Date.now() - step.startedAt;
     delete step.progress;
     save(meta); emit(meta);

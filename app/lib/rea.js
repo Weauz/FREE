@@ -82,7 +82,7 @@ const snapDir = path.join(config.dataDir, 'snapshots');
 export function snapshotPathFor(binPath) {
   const base = path.basename(binPath).replace(/[^\w.-]+/g, '_').slice(0, 60);
   const h = crypto.createHash('sha1').update(String(binPath).toLowerCase()).digest('hex').slice(0, 10);
-  return path.join(snapDir, `${base}-${h}.rea-snapshot.json`);
+  return path.join(snapDir, `${base}-${h}${lightMode ? '-leger' : ''}.rea-snapshot.json`);
 }
 export function hasSnapshot(binPath) { return !!binPath && fs.existsSync(snapshotPathFor(binPath)); }
 export function currentBinaryPath() { return currentBinary; }
@@ -181,17 +181,37 @@ function collectInlinePngs(node, out, depth = 0) {
 
 // Environnement de lancement de REA (partage avec Claude Code pour l'enquete approfondie).
 export function ghidraMemGb() {
-  return Math.max(2, Math.min(32, Math.floor((os.totalmem() / 1073741824) * 0.6)));
+  const ram = os.totalmem() / 1073741824;
+  // Mode allege : on laisse 3 Go a Windows et on donne le reste a Ghidra (jusqu'a 48 Go).
+  if (lightMode) return Math.max(2, Math.min(48, Math.floor(Math.min(ram * 0.8, ram - 3))));
+  return Math.max(2, Math.min(32, Math.floor(ram * 0.6)));
+}
+export function ramGb() { return Math.round(os.totalmem() / 1073741824); }
+
+// Mode allege : apres un manque de memoire, Ghidra est relance avec plus de memoire et sans ses
+// analyses les plus gourmandes (le resultat reste exploitable, un peu moins detaille).
+const LIGHT_ANALYZERS = ['WindowsResourceReference', 'Decompiler Parameter ID', 'Decompiler Switch Analysis', 'Call Convention ID',
+  'Function ID', 'Embedded Media', 'Scalar Operand References', 'Create Address Tables'];
+let lightMode = false;
+export function isLightMode() { return lightMode; }
+export async function restartRea({ light }) {
+  lightMode = !!light;
+  currentBinary = null;
+  await closeRea();
+  await connectRea();
 }
 
 export function reaEnv() {
   const env = { ...process.env };
   if (!env.REA_ANALYSIS_PROVIDER) env.REA_ANALYSIS_PROVIDER = 'ghidra';
   if (!env.REA_GHIDRA_STARTUP_TIMEOUT_MS) env.REA_GHIDRA_STARTUP_TIMEOUT_MS = String(config.ghidraTimeoutMin * 60 * 1000);
-  if (env.REA_GHIDRA_DISABLED_ANALYZERS === undefined) env.REA_GHIDRA_DISABLED_ANALYZERS = 'WindowsResourceReference';
+  if (lightMode) env.REA_GHIDRA_DISABLED_ANALYZERS = LIGHT_ANALYZERS.join(',');
+  else if (env.REA_GHIDRA_DISABLED_ANALYZERS === undefined) env.REA_GHIDRA_DISABLED_ANALYZERS = 'WindowsResourceReference';
   // Memoire de Ghidra (Java) : par defaut Ghidra en prend peu et plante (OutOfMemoryError) sur les gros .exe.
   // On lui donne environ 60 % de la RAM du PC, entre 2 et 32 Go.
-  if (!env.GHIDRA_HEADLESS_MAXMEM) env.GHIDRA_HEADLESS_MAXMEM = `${ghidraMemGb()}G`;
+  // (une valeur trop petite laissee dans les variables Windows est ignoree)
+  const cur = parseInt(env.GHIDRA_HEADLESS_MAXMEM, 10);
+  if (lightMode || !cur || cur < ghidraMemGb()) env.GHIDRA_HEADLESS_MAXMEM = `${ghidraMemGb()}G`;
   return env;
 }
 

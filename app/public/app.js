@@ -522,7 +522,8 @@ function renderSteps(a) {
       body.innerHTML = '<span class="spin"></span>';
       let html = (s.images || []).map((n) => `<img src="/api/analyses/${a.id}/file/${n}" alt="">`).join('');
       if (s.error) html += `<p class="err-text">${esc(s.error)}</p>`;
-      if (/OutOfMemoryError|heap space/i.test(s.error || '')) html += `<div class="callout warn"><span>💡</span><div class="small">Ghidra a manqué de mémoire. FREE lui donne maintenant plus de mémoire automatiquement (environ 60 % de la RAM du PC) : quittez FREE avec le bouton, relancez-le, puis cliquez sur « Relancer l'analyse ». Fermer les gros programmes (jeux, navigateur avec beaucoup d'onglets) aide aussi.</div></div>`;
+      if (s.note && /mode allégé/.test(s.note) && s.status !== 'running') html += `<div class="callout"><span>ℹ️</span><div class="small">${esc(s.note)}</div></div>`;
+      if (/OutOfMemoryError|heap space/i.test(s.error || '')) html += `<div class="callout warn"><span>💡</span><div class="small">Ghidra a manqué de mémoire, même après un nouvel essai automatique en mode allégé (plus de mémoire, analyses gourmandes désactivées). Ce fichier est trop gros pour la RAM de ce PC. Fermez les gros programmes (jeux, navigateur avec beaucoup d'onglets) puis cliquez sur « Relancer l'analyse », ou relancez sans « Analyse approfondie Ghidra » : les autres étapes donnent déjà beaucoup d'informations.</div></div>`;
       if (s.tool && (s.status === 'done' || s.status === 'error')) {
         const r = await api(`/analyses/${a.id}/steps/${s.id}`).catch(() => null);
         if (r) html += `<div class="json">${r.data != null ? jsonView(r.data) : esc(r.text || '')}</div>`;
