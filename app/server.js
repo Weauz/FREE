@@ -157,6 +157,13 @@ app.post('/api/updates/free', wrap(async () => {
 }));
 
 // ---------- Divers
+// Ouvre une page de FREE (GitHub) ou d'Anthropic dans le navigateur habituel (pas dans la fenetre FREE).
+app.post('/api/open-url', wrap((req) => {
+  const u = String(req.body.url || '');
+  if (!/^https:\/\/(github\.com\/Weauz\/FREE|www\.anthropic\.com\/legal)[\w\-\/#%.?=&]*$/i.test(u)) throw new Error('Adresse non autorisée');
+  if (config.isWin) spawn('rundll32.exe', ['url.dll,FileProtocolHandler', u], { detached: true, stdio: 'ignore' }).unref();
+  return { ok: true };
+}));
 app.post('/api/open-folder', wrap((req) => {
   const p = String(req.body.path || '');
   if (!fs.existsSync(p)) throw new Error('Dossier introuvable');

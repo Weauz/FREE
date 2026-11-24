@@ -251,3 +251,12 @@ section[data-apanel] > h2:first-child { margin-top: 18px; }
 .sstep.done .snum { background: var(--green); }
 .sstep p { margin: 4px 0 8px; }
 .status .upd-free { background: #e8f0fe; border: 1px solid #b6ccf7; }
+.legal-box { max-width: 720px; }
+.legal-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin: 12px 0; }
+.legal-cols > div { background: #f7f7f5; border-radius: 10px; padding: 10px 14px; }
+.legal-cols h3 { font-size: 14px; margin: 4px 0 6px; }
+.legal-cols ul { margin: 0; padding-left: 18px; font-size: 13px; line-height: 1.5; }
+.legal-check { display: flex; gap: 10px; align-items: flex-start; background: #fff8e6; border: 1px solid #f0d58c; border-radius: 10px; padding: 10px 12px; font-size: 13.5px; cursor: pointer; }
+.legal-check input { margin-top: 3px; }
+@media (max-width: 640px) { .legal-cols { grid-template-columns: 1fr; } }
+.setup-box a { color: var(--accent); text-decoration: underline; }

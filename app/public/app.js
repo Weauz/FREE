@@ -147,6 +147,44 @@ async function refreshSidebar() {
   } catch { /* serveur indisponible */ }
 }
 // ---------- Bienvenue : installation et connexion de Claude Code
+// ---------- Cadre legal : a accepter une fois avant la premiere utilisation
+const LEGAL_VERSION = 1;
+const LEGAL_URL = 'https://github.com/Weauz/FREE#%EF%B8%8F-cadre-l%C3%A9gal-et-risques';
+function legalAccepted() { return (state.settings?.legalAccepted?.version || 0) >= LEGAL_VERSION; }
+function showLegal(then) {
+  let ov = $('#setup');
+  if (!ov) { ov = document.createElement('div'); ov.id = 'setup'; document.body.appendChild(ov); }
+  ov.innerHTML = `<div class="setup-box legal-box" role="dialog" aria-modal="true" aria-labelledby="legal-t">
+    <img src="logo.svg" alt="" width="48" height="48">
+    <h1 id="legal-t">Avant de commencer ⚖️</h1>
+    <p class="muted">FREE est un outil d'étude. <b>Vous êtes seul responsable de l'usage que vous en faites.</b> En résumé :</p>
+    <div class="legal-cols">
+      <div><h3>✅ Généralement permis</h3><ul>
+        <li>Étudier le fonctionnement d'un logiciel que vous avez le droit d'utiliser</li>
+        <li>Décompiler pour rendre deux programmes compatibles, dans les limites de la loi</li>
+        <li>Analyser vos propres logiciels et sites, ou ceux pour lesquels vous avez une autorisation</li>
+        <li>Analyser un fichier suspect pour vous en protéger</li></ul></div>
+      <div><h3>⛔ Interdit ou risqué</h3><ul>
+        <li>Copier le code, les images, les textes ou la marque d'un logiciel</li>
+        <li>Contourner une protection (DRM, licence, anti-triche, compte)</li>
+        <li>Accéder à des serveurs, données ou comptes sans autorisation</li>
+        <li>Ignorer les conditions d'utilisation, collecter des données personnelles</li>
+        <li>Diffuser une reconstruction qui imite l'original</li></ul></div>
+    </div>
+    <p class="muted small">Ce résumé n'est pas un conseil juridique. <a href="#" id="legal-more">Lire le cadre légal complet</a> (s'ouvre dans votre navigateur).</p>
+    <label class="legal-check"><input type="checkbox" id="legal-ok"> J'ai lu le cadre légal. J'analyse uniquement ce que j'ai le droit d'analyser et je ne reprends rien de protégé dans mes reconstructions.</label>
+    <div class="row" style="justify-content:flex-end;margin-top:14px"><button class="btn primary" id="legal-go" disabled>Continuer</button></div>
+  </div>`;
+  $('#legal-more').onclick = (e) => { e.preventDefault(); api('/open-url', { body: { url: LEGAL_URL } }).catch((err) => toast(err.message)); };
+  $('#legal-ok').onchange = (e) => { $('#legal-go').disabled = !e.target.checked; };
+  $('#legal-go').onclick = async () => {
+    const legalAccepted = { version: LEGAL_VERSION, date: new Date().toISOString() };
+    try { state.settings = await api('/settings', { body: { legalAccepted } }); } catch { state.settings = { ...(state.settings || {}), legalAccepted }; }
+    ov.remove();
+    if (then) then();
+  };
+}
+
 function maybeClaudeSetup(force = false) {
   const c = state.status?.claude;
   if (!c) return;
@@ -819,7 +857,7 @@ es.onmessage = (msg) => {
 
 loadUpdates().then(refreshStatus);
 setTimeout(() => loadUpdates().then(refreshStatus), 20000); // la 1re verification se fait quelques secondes apres le demarrage
-Promise.all([refreshStatus(), api('/settings').then((s) => { state.settings = s; }).catch(() => {})]).then(() => { route(); maybeClaudeSetup(); });
+Promise.all([refreshStatus(), api('/settings').then((s) => { state.settings = s; }).catch(() => {})]).then(() => { route(); if (legalAccepted()) maybeClaudeSetup(); else showLegal(() => maybeClaudeSetup()); });
 setInterval(() => loadUpdates().then(refreshStatus), 30 * 60000);
 refreshSidebar();
 setInterval(refreshStatus, 60000);
